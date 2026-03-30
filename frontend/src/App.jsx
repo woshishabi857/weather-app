@@ -3,18 +3,36 @@ import './index.css';
 
 const API_BASE_URL = 'http://localhost:5001/api';
 
-// Celestial Background Engine (Sun/Moon/Stars)
-const CelestialEffects = ({ is_day }) => {
+// Celestial Background Engine (Sun/Moon/Stars/Weather Effects)
+const CelestialEffects = ({ is_day, weather }) => {
   if (is_day === undefined || is_day === null) return null;
+
+  // Determine weather intensity based on condition
+  const getWeatherIntensity = () => {
+    if (!weather) return 0;
+    const weatherLower = weather.toLowerCase();
+    if (weatherLower.includes('rain') || weatherLower.includes('thunder')) return 1;
+    if (weatherLower.includes('cloud')) return 0.6;
+    if (weatherLower.includes('snow')) return 0.8;
+    return 0;
+  };
+
+  const weatherIntensity = getWeatherIntensity();
+  const isCloudy = weather && weather.toLowerCase().includes('cloud');
+  const isRainy = weather && (weather.toLowerCase().includes('rain') || weather.toLowerCase().includes('thunder'));
+  const isSnowy = weather && weather.toLowerCase().includes('snow');
 
   if (is_day === 1) {
     return (
       <div className="celestial-layer">
+        {/* Sun with weather effects */}
         <div className="sun-body" style={{ 
           width: '350px', 
           height: '350px',
-          boxShadow: '0 0 100px rgba(255, 230, 100, 0.8)'
+          boxShadow: '0 0 100px rgba(255, 230, 100, 0.8)',
+          opacity: Math.max(0.3, 1 - weatherIntensity * 0.7)
         }}></div>
+        
         {/* Sun rays effect */}
         <div style={{ 
           position: 'absolute',
@@ -24,8 +42,125 @@ const CelestialEffects = ({ is_day }) => {
           height: '350px',
           borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(255, 230, 100, 0.2) 0%, rgba(255, 200, 50, 0.1) 40%, rgba(255, 255, 255, 0) 70%)',
-          animation: 'sun-pulse 4s infinite alternate'
+          animation: 'sun-pulse 4s infinite alternate',
+          opacity: Math.max(0.2, 1 - weatherIntensity * 0.8)
         }}></div>
+
+        {/* Clouds for cloudy weather */}
+        {isCloudy && (
+          <>
+            {/* Larger cloud with multiple layers */}
+            <div style={{
+              position: 'absolute',
+              top: '20vh',
+              left: '10vw',
+              width: '250px',
+              height: '100px',
+              animation: 'cloud-float 30s infinite linear'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                left: '20px',
+                width: '180px',
+                height: '60px',
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '40px'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                top: '5px',
+                left: '50px',
+                width: '120px',
+                height: '70px',
+                background: 'rgba(255, 255, 255, 0.8)',
+                borderRadius: '50px'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                top: '15px',
+                left: '80px',
+                width: '100px',
+                height: '60px',
+                background: 'rgba(255, 255, 255, 0.6)',
+                borderRadius: '40px'
+              }}></div>
+            </div>
+            
+            {/* Smaller cloud with different shape */}
+            <div style={{
+              position: 'absolute',
+              top: '15vh',
+              right: '15vw',
+              width: '180px',
+              height: '80px',
+              animation: 'cloud-float 35s infinite linear reverse'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '15px',
+                left: '10px',
+                width: '140px',
+                height: '50px',
+                background: 'rgba(255, 255, 255, 0.6)',
+                borderRadius: '30px'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                top: '5px',
+                left: '40px',
+                width: '90px',
+                height: '55px',
+                background: 'rgba(255, 255, 255, 0.7)',
+                borderRadius: '40px'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                left: '60px',
+                width: '70px',
+                height: '45px',
+                background: 'rgba(255, 255, 255, 0.5)',
+                borderRadius: '30px'
+              }}></div>
+            </div>
+          </>
+        )}
+
+        {/* Rain for rainy weather */}
+        {isRainy && Array.from({ length: 50 }).map((_, i) => (
+          <div
+            key={`rain-${i}`}
+            style={{
+              position: 'absolute',
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              width: '2px',
+              height: '20px',
+              background: 'rgba(174, 194, 224, 0.6)',
+              animation: `rain-fall ${0.5 + Math.random() * 0.3}s infinite linear`,
+              animationDelay: `${Math.random() * 2}s`
+            }}
+          />
+        ))}
+
+        {/* Snow for snowy weather */}
+        {isSnowy && Array.from({ length: 60 }).map((_, i) => (
+          <div
+            key={`snow-${i}`}
+            style={{
+              position: 'absolute',
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              width: `${2 + Math.random() * 3}px`,
+              height: `${2 + Math.random() * 3}px`,
+              background: 'rgba(255, 255, 255, 0.8)',
+              borderRadius: '50%',
+              animation: `snow-fall ${3 + Math.random() * 2}s infinite linear`,
+              animationDelay: `${Math.random() * 5}s`
+            }}
+          />
+        ))}
       </div>
     );
   } else {
@@ -42,18 +177,23 @@ const CelestialEffects = ({ is_day }) => {
             width: `${size}px`,
             height: `${size}px`,
             '--twinkle-dur': `${1 + Math.random() * 3}s`,
-            animationDelay: `${Math.random() * 5}s`
+            animationDelay: `${Math.random() * 5}s`,
+            opacity: Math.max(0.3, 1 - weatherIntensity * 0.8)
           }}
         />
       );
     });
+
     return (
       <div className="celestial-layer">
+        {/* Moon with weather effects */}
         <div className="moon-body" style={{ 
           width: '250px', 
           height: '250px',
-          boxShadow: '0 0 80px rgba(255, 255, 255, 0.6)'
+          boxShadow: '0 0 80px rgba(255, 255, 255, 0.6)',
+          opacity: Math.max(0.3, 1 - weatherIntensity * 0.7)
         }}></div>
+        
         {/* Moon glow effect */}
         <div style={{ 
           position: 'absolute',
@@ -63,8 +203,126 @@ const CelestialEffects = ({ is_day }) => {
           height: '300px',
           borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, rgba(200, 200, 220, 0.1) 40%, rgba(255, 255, 255, 0) 70%)',
-          animation: 'moon-hover 8s infinite alternate ease-in-out'
+          animation: 'moon-hover 8s infinite alternate ease-in-out',
+          opacity: Math.max(0.2, 1 - weatherIntensity * 0.8)
         }}></div>
+
+        {/* Clouds for cloudy weather */}
+        {isCloudy && (
+          <>
+            {/* Larger cloud with multiple layers */}
+            <div style={{
+              position: 'absolute',
+              top: '20vh',
+              left: '10vw',
+              width: '250px',
+              height: '100px',
+              animation: 'cloud-float 30s infinite linear'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                left: '20px',
+                width: '180px',
+                height: '60px',
+                background: 'rgba(200, 200, 220, 0.4)',
+                borderRadius: '40px'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                top: '5px',
+                left: '50px',
+                width: '120px',
+                height: '70px',
+                background: 'rgba(200, 200, 220, 0.5)',
+                borderRadius: '50px'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                top: '15px',
+                left: '80px',
+                width: '100px',
+                height: '60px',
+                background: 'rgba(200, 200, 220, 0.3)',
+                borderRadius: '40px'
+              }}></div>
+            </div>
+            
+            {/* Smaller cloud with different shape */}
+            <div style={{
+              position: 'absolute',
+              top: '15vh',
+              right: '15vw',
+              width: '180px',
+              height: '80px',
+              animation: 'cloud-float 35s infinite linear reverse'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '15px',
+                left: '10px',
+                width: '140px',
+                height: '50px',
+                background: 'rgba(200, 200, 220, 0.3)',
+                borderRadius: '30px'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                top: '5px',
+                left: '40px',
+                width: '90px',
+                height: '55px',
+                background: 'rgba(200, 200, 220, 0.4)',
+                borderRadius: '40px'
+              }}></div>
+              <div style={{
+                position: 'absolute',
+                top: '10px',
+                left: '60px',
+                width: '70px',
+                height: '45px',
+                background: 'rgba(200, 200, 220, 0.2)',
+                borderRadius: '30px'
+              }}></div>
+            </div>
+          </>
+        )}
+
+        {/* Rain for rainy weather */}
+        {isRainy && Array.from({ length: 50 }).map((_, i) => (
+          <div
+            key={`rain-${i}`}
+            style={{
+              position: 'absolute',
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              width: '2px',
+              height: '20px',
+              background: 'rgba(174, 194, 224, 0.4)',
+              animation: `rain-fall ${0.5 + Math.random() * 0.3}s infinite linear`,
+              animationDelay: `${Math.random() * 2}s`
+            }}
+          />
+        ))}
+
+        {/* Snow for snowy weather */}
+        {isSnowy && Array.from({ length: 60 }).map((_, i) => (
+          <div
+            key={`snow-${i}`}
+            style={{
+              position: 'absolute',
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              width: `${2 + Math.random() * 3}px`,
+              height: `${2 + Math.random() * 3}px`,
+              background: 'rgba(255, 255, 255, 0.6)',
+              borderRadius: '50%',
+              animation: `snow-fall ${3 + Math.random() * 2}s infinite linear`,
+              animationDelay: `${Math.random() * 5}s`
+            }}
+          />
+        ))}
+
         {stars}
       </div>
     );
@@ -335,7 +593,7 @@ function App() {
 
   return (
     <>
-      <CelestialEffects is_day={data?.current?.is_day} />
+      <CelestialEffects is_day={data?.current?.is_day} weather={data?.current?.weather?.[0]?.main} />
       <WeatherEffects weather={data?.current?.weather?.[0]?.main} />
 
       <div className="ios-layout">
