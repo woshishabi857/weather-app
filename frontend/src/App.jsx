@@ -121,7 +121,33 @@ function App() {
 
   useEffect(() => {
     fetchLocations();
-    fetchWeather('Shanghai');
+    // 尝试获取用户地理位置
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          try {
+            const res = await fetch(`${API_BASE_URL}/weather?lat=${latitude}&lon=${longitude}`);
+            const payload = await res.json();
+            if (res.ok) {
+              setData(payload);
+            }
+          } catch (err) {
+            console.error('Error fetching weather by geolocation:', err);
+            // 如果地理位置获取失败，默认显示上海天气
+            fetchWeather('Shanghai');
+          }
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          // 如果用户拒绝地理位置访问，默认显示上海天气
+          fetchWeather('Shanghai');
+        }
+      );
+    } else {
+      // 浏览器不支持地理位置，默认显示上海天气
+      fetchWeather('Shanghai');
+    }
   }, []);
 
   // Debounced Auto-suggestions
@@ -417,10 +443,10 @@ function App() {
                 <div className="glass-widget">
                   <div className="widget-header">🌅 Sunrise & Sunset</div>
                   <div style={{ fontSize: '20px', fontWeight: '500', marginBottom: '8px', marginTop: '4px' }}>
-                    ☀️ {data.daily ? formatISOToTime(data.daily.sunrise[0]) : '--:--'}
+                    ☀️ {data.daily && data.daily.sunrise && data.daily.sunrise.length > 0 ? formatISOToTime(data.daily.sunrise[0]) : '--:--'}
                   </div>
                   <div style={{ fontSize: '20px', fontWeight: '500' }}>
-                    🌇 {data.daily ? formatISOToTime(data.daily.sunset[0]) : '--:--'}
+                    🌇 {data.daily && data.daily.sunset && data.daily.sunset.length > 0 ? formatISOToTime(data.daily.sunset[0]) : '--:--'}
                   </div>
                 </div>
 
@@ -451,7 +477,9 @@ function App() {
 
               </div>
             </div>
-          ) : null}
+          ) : (
+            <div style={{ margin: 'auto' }}>No weather data available. Please search for a city.</div>
+          )}
         </main>
       </div>
     </>

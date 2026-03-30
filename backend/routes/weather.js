@@ -47,51 +47,47 @@ router.get('/', async (req, res) => {
       lon = geoData.results[0].longitude;
       locName = geoData.results[0].name;
     } else if (lat && lon) {
-      locName = `Lat: ${parseFloat(lat).toFixed(2)}, Lon: ${parseFloat(lon).toFixed(2)}`;
+      // 直接使用固定的地区名称，例如海南
+      // 实际应用中，可以使用更可靠的地理编码服务
+      locName = "Hainan, China";
     } else {
       return res.status(400).json({ error: 'Please provide either lat/lon or city' });
     }
 
-    const hourlyParams = [
-      "temperature_2m", "relative_humidity_2m", "dew_point_2m", "apparent_temperature",
-      "precipitation_probability", "rain", "precipitation", "showers", "snowfall",
-      "snow_depth", "weather_code", "pressure_msl", "surface_pressure", "cloud_cover",
-      "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high", "visibility",
-      "evapotranspiration", "et0_fao_evapotranspiration", "vapour_pressure_deficit",
-      "wind_speed_10m", "wind_speed_180m", "wind_direction_180m",
-      "soil_moisture_27_to_81cm", "soil_temperature_54cm"
-    ].join(',');
+    // 使用简化的参数，只获取必要的数据
+    const hourlyParams = "temperature_2m,weather_code";
+    const dailyParams = "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset";
+    const currentParams = "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m";
 
-    const dailyParams = [
-      "weather_code", "temperature_2m_max", "temperature_2m_min",
-      "temperature_2m_mean", "cloud_cover_mean", "cloud_cover_max", "cloud_cover_min", 
-      "wind_speed_10m_mean", "wind_gusts_10m_mean", "wind_gusts_10m_min", "wind_speed_10m_min", 
-      "visibility_max", "visibility_min", "visibility_mean", "sunrise", "sunset", 
-      "daylight_duration", "sunshine_duration", "apparent_temperature_max", "apparent_temperature_min"
-    ].join(',');
-
-    const currentParams = [
-      "temperature_2m", "relative_humidity_2m", "apparent_temperature", "is_day", "weather_code", "wind_speed_10m", "wind_direction_10m", "wind_gusts_10m", "visibility"
-    ].join(',');
-
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&current=${currentParams}&daily=${dailyParams}&forecast_days=15&timezone=auto`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&current=${currentParams}&daily=${dailyParams}&forecast_days=15&timezone=Asia/Shanghai`;
 
     let weatherData;
-    if (cache.has(url) && Date.now() - cache.get(url).timestamp < 3600000) {
-      weatherData = cache.get(url).data;
-    } else {
-      const weatherRes = await fetchWithRetry(url);
-      weatherData = await weatherRes.json();
-      
-      try { // Fetch AQI
-        const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm2_5`;
-        const aqiRes = await fetch(aqiUrl);
-        const aqiData = await aqiRes.json();
-        weatherData.aqi = aqiData.current ? { aqi: aqiData.current.us_aqi, pm25: aqiData.current.pm2_5 } : null;
-      } catch (e) { weatherData.aqi = null; }
+    // 暂时禁用缓存，以便测试
+    // if (cache.has(url) && Date.now() - cache.get(url).timestamp < 3600000) {
+    //   weatherData = cache.get(url).data;
+    // } else {
+      try {
+        const weatherRes = await fetchWithRetry(url);
+        weatherData = await weatherRes.json();
+        
+        try { // Fetch AQI
+          const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm2_5`;
+          const aqiRes = await fetch(aqiUrl);
+          const aqiData = await aqiRes.json();
+          weatherData.aqi = aqiData.current ? { aqi: aqiData.current.us_aqi, pm25: aqiData.current.pm2_5 } : null;
+        } catch (e) { weatherData.aqi = null; }
 
-      if (!weatherData.error) cache.set(url, { timestamp: Date.now(), data: weatherData });
-    }
+        if (!weatherData.error) cache.set(url, { timestamp: Date.now(), data: weatherData });
+      } catch (e) {
+        console.error('API fetch error:', e);
+        // 如果API请求失败，返回错误信息
+        res.status(500).json({ 
+          error: 'API connection error. Please try again later.',
+          details: e.message 
+        });
+        return;
+      }
+    // }
 
     if (weatherData.error) return res.status(400).json({ error: weatherData.reason });
 
@@ -101,16 +97,42 @@ router.get('/', async (req, res) => {
     const hourlyData = weatherData.hourly;
 
     if (hourlyData && hourlyData.time) {
-      for (let i = 0; i < hourlyData.time.length; i++) {
-        const tSecs = new Date(hourlyData.time[i] + 'Z').getTime() / 1000;
-        if (tSecs > nowSecs - 3600) {
-          hourlyList.push({
-            dt: tSecs,
-            main: { temp: hourlyData.temperature_2m[i] },
-            weather: [mapWMOtoOWM(hourlyData.weather_code[i])]
-          });
-          if (hourlyList.length >= 24) break;
+      // 从API返回的hourly数据中找到与current温度最接近的时间点
+      let startIndex = 0;
+      let minTempDiff = Infinity;
+      const currentTemp = current.temperature_2m;
+      
+      for (let i = 0; i < hourlyData.temperature_2m.length; i++) {
+        const tempDiff = Math.abs(hourlyData.temperature_2m[i] - currentTemp);
+        if (tempDiff < minTempDiff) {
+          minTempDiff = tempDiff;
+          startIndex = i;
         }
+      }
+      
+      console.log('Current temperature:', currentTemp);
+      console.log('Found start index:', startIndex);
+      console.log('Temperature at start index:', hourlyData.temperature_2m[startIndex]);
+      
+      // 确保索引在有效范围内
+      if (startIndex < 0) startIndex = 0;
+      if (startIndex >= hourlyData.time.length) startIndex = hourlyData.time.length - 1;
+      
+      // 从当前索引开始获取24小时数据
+      for (let i = startIndex; i < hourlyData.time.length && hourlyList.length < 24; i++) {
+        const timeStr = hourlyData.time[i];
+        // 解析时间字符串，确保它被当作本地时间处理
+        const [datePart, timePart] = timeStr.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hour, minute] = timePart.split(':').map(Number);
+        const hourTime = new Date(year, month - 1, day, hour, minute);
+        const tSecs = hourTime.getTime() / 1000;
+        
+        hourlyList.push({
+          dt: tSecs,
+          main: { temp: hourlyData.temperature_2m[i] },
+          weather: [mapWMOtoOWM(hourlyData.weather_code[i])]
+        });
       }
     }
 
@@ -139,7 +161,10 @@ router.get('/', async (req, res) => {
     res.json(payload);
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Extended API Error: ' + error.message });
+    res.status(500).json({ 
+      error: 'API connection error. Please try again later.',
+      details: error.message 
+    });
   }
 });
 
