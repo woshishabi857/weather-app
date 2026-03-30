@@ -54,10 +54,10 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'Please provide either lat/lon or city' });
     }
 
-    // 使用简化的参数，只获取必要的数据
-    const hourlyParams = "temperature_2m,weather_code";
-    const dailyParams = "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset";
-    const currentParams = "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m";
+    // 获取更全面的天气数据
+    const hourlyParams = "temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,wind_direction_10m,pressure_msl,visibility";
+    const dailyParams = "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,wind_speed_10m_max";
+    const currentParams = "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,visibility,precipitation";
 
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${hourlyParams}&current=${currentParams}&daily=${dailyParams}&forecast_days=15&timezone=Asia/Shanghai`;
 
@@ -137,26 +137,31 @@ router.get('/', async (req, res) => {
     }
 
     const payload = {
-      current: {
-        name: locName,
-        coord: { lat: parseFloat(lat), lon: parseFloat(lon) },
-        weather: [mapWMOtoOWM(current.weather_code)],
-        main: {
-          temp: current.temperature_2m,
-          feels_like: current.apparent_temperature,
-          humidity: current.relative_humidity_2m,
-          temp_max: weatherData.daily ? weatherData.daily.temperature_2m_max[0] : 0,
-          temp_min: weatherData.daily ? weatherData.daily.temperature_2m_min[0] : 0
-        },
-        wind: { speed: current.wind_speed_10m },
-        visibility: current.visibility || 10000, 
-        is_day: current.is_day,
-        air_quality: weatherData.aqi
+    current: {
+      name: locName,
+      coord: { lat: parseFloat(lat), lon: parseFloat(lon) },
+      weather: [mapWMOtoOWM(current.weather_code)],
+      main: {
+        temp: current.temperature_2m,
+        feels_like: current.apparent_temperature,
+        humidity: current.relative_humidity_2m,
+        temp_max: weatherData.daily ? weatherData.daily.temperature_2m_max[0] : 0,
+        temp_min: weatherData.daily ? weatherData.daily.temperature_2m_min[0] : 0,
+        pressure: current.pressure_msl
       },
-      daily: weatherData.daily,
-      forecast: hourlyList,
-      raw_hourly_expert_data: hourlyData
-    };
+      wind: { 
+        speed: current.wind_speed_10m,
+        direction: current.wind_direction_10m
+      },
+      visibility: current.visibility || 10000, 
+      precipitation: current.precipitation,
+      is_day: current.is_day,
+      air_quality: weatherData.aqi
+    },
+    daily: weatherData.daily,
+    forecast: hourlyList,
+    raw_hourly_expert_data: hourlyData
+  };
 
     res.json(payload);
   } catch (error) {

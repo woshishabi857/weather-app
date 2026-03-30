@@ -10,23 +10,38 @@ const CelestialEffects = ({ is_day }) => {
   if (is_day === 1) {
     return (
       <div className="celestial-layer">
-        <div className="sun-body"></div>
+        <div className="sun-body" style={{ 
+          width: '350px', 
+          height: '350px',
+          boxShadow: '0 0 100px rgba(255, 230, 100, 0.8)'
+        }}></div>
+        {/* Sun rays effect */}
+        <div style={{ 
+          position: 'absolute',
+          top: '8vh',
+          left: '15vw',
+          width: '350px',
+          height: '350px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(255, 230, 100, 0.2) 0%, rgba(255, 200, 50, 0.1) 40%, rgba(255, 255, 255, 0) 70%)',
+          animation: 'sun-pulse 4s infinite alternate'
+        }}></div>
       </div>
     );
   } else {
     // Generate Night Stars
-    const stars = Array.from({ length: 80 }).map((_, i) => {
-      const size = 1 + Math.random() * 2;
+    const stars = Array.from({ length: 120 }).map((_, i) => {
+      const size = 1 + Math.random() * 3;
       return (
         <div
           key={i}
           className="star-particle"
           style={{
             left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 60}%`, // Mostly in the upper half
+            top: `${Math.random() * 80}%`,
             width: `${size}px`,
             height: `${size}px`,
-            '--twinkle-dur': `${2 + Math.random() * 4}s`,
+            '--twinkle-dur': `${1 + Math.random() * 3}s`,
             animationDelay: `${Math.random() * 5}s`
           }}
         />
@@ -34,7 +49,22 @@ const CelestialEffects = ({ is_day }) => {
     });
     return (
       <div className="celestial-layer">
-        <div className="moon-body"></div>
+        <div className="moon-body" style={{ 
+          width: '250px', 
+          height: '250px',
+          boxShadow: '0 0 80px rgba(255, 255, 255, 0.6)'
+        }}></div>
+        {/* Moon glow effect */}
+        <div style={{ 
+          position: 'absolute',
+          top: '10vh',
+          right: '15vw',
+          width: '300px',
+          height: '300px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, rgba(200, 200, 220, 0.1) 40%, rgba(255, 255, 255, 0) 70%)',
+          animation: 'moon-hover 8s infinite alternate ease-in-out'
+        }}></div>
         {stars}
       </div>
     );
@@ -95,6 +125,23 @@ function getAQILabel(aqi) {
   return { text: "Hazardous", color: "#b71c1c" };
 }
 
+// Helper for wind direction
+function getWindDirection(degrees) {
+  if (!degrees) return "Unknown";
+  const directions = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  const index = Math.round((degrees % 360) / 22.5) % 16;
+  return directions[index];
+}
+
+// Helper for UV index level
+function getUVIndexLevel(index) {
+  if (index <= 2) return "Low";
+  if (index <= 5) return "Moderate";
+  if (index <= 7) return "High";
+  if (index <= 10) return "Very High";
+  return "Extreme";
+}
+
 // Map WMO to Main weather strings for daily icon rendering
 function getIconForWMO(wmoCode) {
   if (wmoCode === 0) return '01d';
@@ -111,6 +158,7 @@ function App() {
   const [searchCity, setSearchCity] = useState('');
   const [data, setData] = useState(null);
   const [locations, setLocations] = useState([]);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -131,6 +179,12 @@ function App() {
             const payload = await res.json();
             if (res.ok) {
               setData(payload);
+              setCurrentLocation({
+                name: payload.current.name,
+                lat: payload.current.coord.lat,
+                lon: payload.current.coord.lon,
+                isCurrentLocation: true
+              });
             }
           } catch (err) {
             console.error('Error fetching weather by geolocation:', err);
@@ -319,6 +373,21 @@ function App() {
           </form>
 
           <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
+            {/* Current Location at the top */}
+            {currentLocation && (
+              <div className="location-item" style={{ backgroundColor: 'rgba(255, 255, 255, 0.15)' }}>
+                <div onClick={() => fetchWeather(currentLocation.name)} style={{ flex: 1 }}>
+                  <div style={{ fontSize: '18px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    📍 {currentLocation.name}
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Current Location • Lat: {currentLocation.lat?.toFixed(2)} • Lon: {currentLocation.lon?.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Saved Locations */}
             {locations.map(loc => (
               <div key={loc.id} className="location-item">
                 <div onClick={() => fetchWeather(loc.name)} style={{ flex: 1 }}>
@@ -472,6 +541,56 @@ function App() {
                   <div className="widget-value">{Math.round(data.current.main.feels_like)}°</div>
                   <div style={{ marginTop: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
                     {data.current.main.feels_like > data.current.main.temp ? 'Humidity is making it feel warmer.' : 'Wind is making it feel cooler.'}
+                  </div>
+                </div>
+
+                <div className="glass-widget">
+                  <div className="widget-header">🌬 Wind Direction</div>
+                  <div className="widget-value">{data.current.wind.direction || '--'}°</div>
+                  <div style={{ marginTop: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {getWindDirection(data.current.wind.direction)}
+                  </div>
+                </div>
+
+                <div className="glass-widget">
+                  <div className="widget-header">🌡 Pressure</div>
+                  <div className="widget-value">{data.current.main.pressure || '--'} <span className="widget-unit">hPa</span></div>
+                  <div style={{ marginTop: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {data.current.main.pressure > 1013 ? 'High pressure' : data.current.main.pressure < 1013 ? 'Low pressure' : 'Normal pressure'}
+                  </div>
+                </div>
+
+                <div className="glass-widget">
+                  <div className="widget-header">🌧 Precipitation</div>
+                  <div className="widget-value">{data.current.precipitation || 0} <span className="widget-unit">mm</span></div>
+                  <div style={{ marginTop: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {data.current.precipitation > 0 ? 'Currently raining' : 'No precipitation'}
+                  </div>
+                </div>
+
+                <div className="glass-widget">
+                  <div className="widget-header">☀️ UV Index</div>
+                  <div className="widget-value">{data.daily && data.daily.uv_index_max ? data.daily.uv_index_max[0] : '--'}</div>
+                  <div style={{ marginTop: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {getUVIndexLevel(data.daily && data.daily.uv_index_max ? data.daily.uv_index_max[0] : 0)}
+                  </div>
+                </div>
+
+                <div className="glass-widget">
+                  <div className="widget-header">📊 Weather Stats</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Humidity</div>
+                      <div style={{ fontSize: '18px', fontWeight: '500' }}>{data.current.main.humidity}%</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Visibility</div>
+                      <div style={{ fontSize: '18px', fontWeight: '500' }}>{data.current.visibility ? Math.round(data.current.visibility / 1000) : 10}km</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>Wind</div>
+                      <div style={{ fontSize: '18px', fontWeight: '500' }}>{data.current.wind.speed}m/s</div>
+                    </div>
                   </div>
                 </div>
 
